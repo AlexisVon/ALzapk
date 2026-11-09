@@ -1,0 +1,30 @@
+# Build output
+build/
+bin/
+
+# AlxLib package: tracked are include/, doc/, licenses/, README/LICENSE/THIRD-PARTY
+lib/alxlib/bin/
+lib/alxlib/lib/
+lib/alxlib/*.tar.gz
+lib/alxlib/*.zip
+
+# IDE / cache
+.cache/
+.vscode/settings.json
+__pycache__/
+
+# Compiled files
+*.o
+*.d
+*.so
+*.a
+*.debug
+*.pdb
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# MSVC local files
+msvc/.vs/
+*.vcxproj.user

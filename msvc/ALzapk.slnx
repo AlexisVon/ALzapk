@@ -1,0 +1,14 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+  </Configurations>
+  <Folder Name="/ALzapk/">
+    <Project Path="LzaCore/LzaCore.vcxproj" Id="3e9bf87a-1e66-488f-9903-019116b7f59d" />
+    <Project Path="LzaCli/LzaCli.vcxproj" Id="61638d43-d991-41b9-9e54-f84cf3030257">
+      <BuildDependency Project="LzaCore/LzaCore.vcxproj" />
+    </Project>
+    <Project Path="LzaUi/LzaUi.vcxproj" Id="cab86e31-23be-43df-8622-c7604ce39b25">
+      <BuildDependency Project="LzaCore/LzaCore.vcxproj" />
+    </Project>
+  </Folder>
+</Solution>
