@@ -43,4 +43,22 @@ namespace lza {
         return buf;
     }
 
+    std::string variant_string(const alx::variant& _value) {
+        if (_value.null()) return "null";
+        if (_value.is<std::string>()) return _value.to<std::string>();
+        if (_value.is<bool>()) return _value.to<bool>() ? "true" : "false";
+        if (_value.is_integer()) return std::to_string(_value.to<long long>());
+        if (_value.is_uinteger()) return std::to_string(_value.to<unsigned long long>());
+        if (_value.is<float>() || _value.is<double>()) {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%g", _value.to<double>());
+            return buf;
+        }
+        if (_value.is<alx::bytes>()) return "<bytes>";
+        if (_value.is_map()) return "<map>";
+        if (_value.is_vec()) return "<vector>";
+        if (_value.is_lst()) return "<list>";
+        return "<value>";
+    }
+
 }

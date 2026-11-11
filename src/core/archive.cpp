@@ -43,13 +43,13 @@ namespace lza {
         }
         if (_entry.is<alx::varvec>()) {
             const alx::varvec& blocks = _entry.to<alx::varvec>();
-            return blocks.size() & 1U ? uint64_t(blocks.back().to<alx::uint_64>()) : 0;
+            return !blocks.empty() && blocks.back().is<alx::uint_64>() ? uint64_t(blocks.back().to<alx::uint_64>()) : 0;
         }
         return 0;
     }
 
-    archive::archive(alx::fpacker::decoder* _decoder)
-        : m_decoder(_decoder) {
+    archive::archive(alx::fpacker::decoder* _decoder, uint8_t _version, bool _encrypt, bool _compress)
+        : m_decoder(_decoder), m_version(_version), m_encrypt(_encrypt), m_compress(_compress) {
     }
 
     archive::~archive() {
@@ -63,24 +63,53 @@ namespace lza {
             return nullptr;
         }
 
-        auto* decoder = new alx::fpacker::decoder(new alx::istream_file(alx::file_info(_path)), _password);
-        if (!decoder->valid()) {
-            if (decoder->is_encrypt()) _result = _password.empty() ? open_result::need_password : open_result::bad_password;
-            else _result = open_result::invalid;
-            delete decoder;
+        auto* stream = new alx::istream_file(alx::file_info(_path));
+        const alx::fpacker::decoder::pktype type = alx::fpacker::decoder::probe(*stream);
+        if (!type.clan) {
+            _result = open_result::invalid;
+            delete stream;
+            return nullptr;
+        }
+        if (type.encrypt && _password.empty()) {
+            _result = open_result::need_password;
+            delete stream;
+            return nullptr;
+        }
+
+        uint8_t code{0};
+        alx::fpacker::decoder* decoder = alx::fpacker::decoder::create(stream, _password, &code);
+        if (decoder == nullptr) {
+            switch (code) {
+            case alx::fpacker::decoder::badversion:
+            case alx::fpacker::decoder::badparams: _result = open_result::invalid; break;
+            case alx::fpacker::decoder::badauth: _result = open_result::bad_password; break;
+            default: _result = type.encrypt ? open_result::bad_password : open_result::invalid; break;
+            }
             return nullptr;
         }
 
         _result = open_result::ok;
-        return std::unique_ptr<archive>(new archive(decoder));
+        return std::unique_ptr<archive>(new archive(decoder, type.version, type.encrypt, type.cmps));
     }
 
     const alx::varmap& archive::fsystem() const {
         return m_decoder->fsystem();
     }
 
+    uint8_t archive::version() const {
+        return m_version;
+    }
+
     bool archive::is_encrypt() const {
-        return m_decoder->is_encrypt();
+        return m_encrypt;
+    }
+
+    bool archive::is_compress() const {
+        return m_compress;
+    }
+
+    const alx::varmap& archive::info() const {
+        return m_decoder->archive();
     }
 
     uint64_t archive::stream_bytes() const {

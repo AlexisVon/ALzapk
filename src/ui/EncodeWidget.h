@@ -8,6 +8,7 @@
 
 class FileTableModel;
 class QCheckBox;
+class QComboBox;
 class QFrame;
 class QLineEdit;
 class QPushButton;
@@ -54,6 +55,7 @@ private:
         quint64 total{0};
         bool compress{false};
         bool igerr{false};
+        bool legacy_v1{false};
         std::string password;
     };
 
@@ -63,6 +65,7 @@ private:
     QCheckBox* ui_cb_compress{nullptr};
     QCheckBox* ui_cb_encrypt{nullptr};
     QCheckBox* ui_cb_igerr{nullptr};
+    QComboBox* ui_cb_profile{nullptr};
     QFrame* ui_fm_password{nullptr};
     QLineEdit* ui_le_password{nullptr};
     QPushButton* ui_btn_showpwd{nullptr};

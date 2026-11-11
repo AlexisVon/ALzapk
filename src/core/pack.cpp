@@ -6,6 +6,12 @@
 #include <afpacker.h>
 #include <astream_ex.h>
 
+#include <memory>
+
+#ifndef LZA_VERSION
+#    define LZA_VERSION "1.0.0"
+#endif
+
 namespace {
 
     uint64_t total_source_bytes(const std::vector<lza::pack_item>& _items) {
@@ -27,14 +33,31 @@ namespace lza {
         pack_result result;
         result.source_bytes = total_source_bytes(_items);
 
-        alx::fpacker::encoder packer(_options.compress, _options.password);
-        packer.set_abort_flag(_abort);
-        packer.set_igerr_linkfile(true);
-        packer.set_igerr_notexist(_options.ignore_errors);
+        uint8_t code{0};
+        std::unique_ptr<alx::fpacker::encoder> packer;
+        if (_options.password.empty()) {
+            packer.reset(alx::fpacker::encoder::create(_options.compress, &code));
+        } else if (_options.format == pack_format::legacy_v1) {
+            packer.reset(alx::fpacker::encoder::create_encrypt_v1(_options.password, _options.compress, &code));
+        } else if (_options.kdf_iterations == 0) {
+            packer.reset(alx::fpacker::encoder::create_encrypt_v2(_options.password, _options.compress, &code));
+        } else {
+            packer.reset(alx::fpacker::encoder::create_encrypt_v2(_options.password, _options.compress, &code, 0X04000000U,
+                                                                  _options.kdf_iterations));
+        }
+        if (!packer) {
+            result.state = pack_result::bad_params;
+            result.error = code;
+            return result;
+        }
+
+        packer->set_abort_flag(_abort);
+        packer->set_igerr_linkfile(true);
+        packer->set_igerr_notexist(_options.ignore_errors);
 
         uint64_t done{0};
         progress_reporter reporter(result.source_bytes);
-        packer.set_print_rtmsg([&](const std::string& _name, uint64_t _total, uint64_t _current) {
+        packer->set_print_rtmsg([&](const std::string& _name, uint64_t _total, uint64_t _current) {
             if (_total == uint64_t(-1)) {
                 result.failed_file = _name;
                 result.error = uint8_t(_current);
@@ -49,30 +72,33 @@ namespace lza {
             if (reporter.tick(execed, snapshot) && _on_progress) {
                 pack_progress info;
                 info.stat = snapshot;
-                info.archive_bytes = packer.get_stream() ? packer.get_stream()->total() : 0;
+                info.archive_bytes = packer->get_stream() ? packer->get_stream()->total() : 0;
                 info.source_bytes = result.source_bytes;
                 _on_progress(info);
             }
             if (_on_file) _on_file(_name, _total, _current);
         });
 
-        if (!packer.start(new alx::ostream_file(alx::file_info(_archive), false))) {
+        if (!packer->start(new alx::ostream_file(alx::file_info(_archive), false))) {
             result.state = pack_result::open_failed;
             return result;
         }
 
-        uint8_t ret{packer.success};
+        packer->archive()["app"] = std::string("ALzapk");
+        packer->archive()["version"] = std::string(LZA_VERSION);
+
+        uint8_t ret{alx::fpacker::encoder::success};
         for (const auto& item : _items) {
-            ret = packer.append(alx::file_info(item.path), item.name);
-            if (ret != packer.success) break;
+            ret = packer->append(alx::file_info(item.path), item.name);
+            if (ret != alx::fpacker::encoder::success) break;
         }
 
-        if (ret != packer.success) {
+        if (ret != alx::fpacker::encoder::success) {
             result.error = ret;
             result.state = _abort && *_abort ? pack_result::aborted : pack_result::append_failed;
             return result;
         }
-        if (!packer.finish()) {
+        if (!packer->finish()) {
             result.state = pack_result::finish_failed;
             return result;
         }

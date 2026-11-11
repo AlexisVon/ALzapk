@@ -29,11 +29,14 @@ namespace {
         "  l   List the archive contents\n"
         "\n"
         "Switches:\n"
-        "  -c           Compress file data (LZ4)\n"
-        "  -p<password> Encrypt with a password\n"
-        "  -o<dir>      Output directory for x (default: current directory)\n"
-        "  -i           Ignore missing sources when packing\n"
-        "  -h, --help   Show this help\n"
+        "  -c            Compress file data (LZ4)\n"
+        "  -p<password>  Encrypt with a password (v2 authenticated by default)\n"
+        "  -mv1          Use the legacy v1 encryption format (with -p)\n"
+        "  -mv2          Use the authenticated v2 format (with -p, default)\n"
+        "  -k<N>         v2 key-derivation rounds, 1..16777216 (default 4194304)\n"
+        "  -o<dir>       Output directory for x (default: current directory)\n"
+        "  -i            Ignore missing sources when packing\n"
+        "  -h, --help    Show this help\n"
         "  -v, --version Show version\n"
         "\n"
         "Item paths use '/' as the separator, e.g. root/dir/file.\n";
@@ -45,9 +48,25 @@ namespace {
         bool compress{false};
         bool ignore_errors{false};
         bool output_given{false};
+        bool format_given{false};
+        bool kdf_given{false};
         std::string password;
         std::string output{"."};
+        lza::pack_format format{lza::pack_format::authenticated_v2};
+        uint32_t kdf_iterations{0};
     };
+
+    bool parse_u32(const std::string& _text, uint32_t& _value) {
+        if (_text.empty()) return false;
+        uint64_t value{0};
+        for (const char ch : _text) {
+            if (ch < '0' || ch > '9') return false;
+            value = value * 10 + uint64_t(ch - '0');
+            if (value > 0XFFFFFFFFU) return false;
+        }
+        _value = uint32_t(value);
+        return true;
+    }
 
     int parse(int _argc, char** _argv, options& _opt) {
         if (_argc < 2) {
@@ -89,6 +108,28 @@ namespace {
                     }
                     _opt.password = arg.substr(2);
                     break;
+                case 'm': {
+                    const std::string profile = arg.substr(2);
+                    if (profile == "v1") _opt.format = lza::pack_format::legacy_v1;
+                    else if (profile == "v2") _opt.format = lza::pack_format::authenticated_v2;
+                    else {
+                        fputs("lza-cli: -m requires v1 or v2\n", stderr);
+                        return 2;
+                    }
+                    _opt.format_given = true;
+                    break;
+                }
+                case 'k':
+                    if (!parse_u32(arg.substr(2), _opt.kdf_iterations)) {
+                        fputs("lza-cli: -k requires an attached round count\n", stderr);
+                        return 2;
+                    }
+                    if (_opt.kdf_iterations < 1 || _opt.kdf_iterations > 0X01000000U) {
+                        fputs("lza-cli: -k must be 1..16777216\n", stderr);
+                        return 2;
+                    }
+                    _opt.kdf_given = true;
+                    break;
                 case 'o':
                     if (arg.size() == 2) {
                         fputs("lza-cli: -o requires an attached directory\n", stderr);
@@ -120,18 +161,26 @@ namespace {
                 fputs("lza-cli: -o is only valid for x\n", stderr);
                 return 2;
             }
+            if ((_opt.format_given || _opt.kdf_given) && _opt.password.empty()) {
+                fputs("lza-cli: -m and -k require -p<password>\n", stderr);
+                return 2;
+            }
+            if (_opt.kdf_given && _opt.format == lza::pack_format::legacy_v1) {
+                fputs("lza-cli: -k is only valid with -mv2\n", stderr);
+                return 2;
+            }
         } else if (_opt.command == 'l') {
             if (!_opt.items.empty()) {
                 fputs("lza-cli: l: unexpected item arguments\n", stderr);
                 return 2;
             }
-            if (_opt.compress || _opt.ignore_errors || _opt.output_given) {
-                fputs("lza-cli: -c, -i and -o are only valid for a or x\n", stderr);
+            if (_opt.compress || _opt.ignore_errors || _opt.output_given || _opt.format_given || _opt.kdf_given) {
+                fputs("lza-cli: only -p is valid for l\n", stderr);
                 return 2;
             }
         } else {
-            if (_opt.compress || _opt.ignore_errors) {
-                fputs("lza-cli: -c and -i are only valid for a\n", stderr);
+            if (_opt.compress || _opt.ignore_errors || _opt.format_given || _opt.kdf_given) {
+                fputs("lza-cli: -c, -i, -m and -k are only valid for a\n", stderr);
                 return 2;
             }
         }
@@ -157,6 +206,19 @@ namespace {
         const std::string where = _result.failed_file.empty() ? _target : _result.failed_file;
         fprintf(stderr, "lza-cli: %s: %s\n", where.c_str(), lza::extract_error(_result.error));
         return 1;
+    }
+
+    std::string archive_type(const lza::archive& _archive) {
+        std::string result = _archive.version() == 2 ? "v2 (authenticated)" : "v1 (legacy)";
+        result += _archive.is_compress() ? ", compressed" : ", stored";
+        result += _archive.is_encrypt() ? ", encrypted" : ", plain";
+        return result;
+    }
+
+    void print_info(const alx::varmap& _info) {
+        if (_info.empty()) return;
+        fputs("Info:\n", stdout);
+        for (const auto& it : _info) printf("  %s: %s\n", it.first.c_str(), lza::variant_string(*it.second).c_str());
     }
 
     int command_add(const options& _opt) {
@@ -192,6 +254,8 @@ namespace {
         pack_options.compress = _opt.compress;
         pack_options.ignore_errors = _opt.ignore_errors;
         pack_options.password = _opt.password;
+        pack_options.format = _opt.format;
+        pack_options.kdf_iterations = _opt.kdf_iterations;
 
         printf("Creating archive: %s\n", _opt.archive.c_str());
         bool warned{false};
@@ -217,8 +281,12 @@ namespace {
             return 0;
         }
         case lza::pack_result::aborted: fputs("lza-cli: aborted\n", stderr); return 1;
+        case lza::pack_result::bad_params:
+            fprintf(stderr, "lza-cli: %s: %s\n", _opt.archive.c_str(), lza::pack_error(result.error));
+            return 1;
         case lza::pack_result::open_failed:
-            fprintf(stderr, "lza-cli: %s: cannot write the archive\n", _opt.archive.c_str());
+            if (result.error != 0) fprintf(stderr, "lza-cli: %s: %s\n", _opt.archive.c_str(), lza::pack_error(result.error));
+            else fprintf(stderr, "lza-cli: %s: cannot write the archive\n", _opt.archive.c_str());
             return 1;
         case lza::pack_result::append_failed:
             if (!warned) fprintf(stderr, "lza-cli: %s: %s\n", result.failed_file.c_str(), lza::pack_error(result.error));
@@ -255,8 +323,10 @@ namespace {
         const auto archive = lza::archive::open(_opt.archive, _opt.password, open_result);
         if (!archive) return report_open_error(_opt.archive, open_result);
 
-        printf("Listing archive: %s\n\n", _opt.archive.c_str());
-        printf("%12s  %s\n", "Size", "Name");
+        printf("Listing archive: %s\n", _opt.archive.c_str());
+        printf("Type: %s\n", archive_type(*archive).c_str());
+        print_info(archive->info());
+        printf("\n%12s  %s\n", "Size", "Name");
         printf("%12s  %s\n", "------------", "----");
 
         list_stats stats;
@@ -296,7 +366,7 @@ namespace {
         const auto archive = lza::archive::open(_opt.archive, _opt.password, open_result);
         if (!archive) return report_open_error(_opt.archive, open_result);
 
-        printf("Extracting archive: %s\n", _opt.archive.c_str());
+        printf("Extracting archive: %s (%s)\n", _opt.archive.c_str(), archive_type(*archive).c_str());
         const auto on_file = [](const std::string& _file, uint64_t _total, uint64_t _current) {
             if (_total != uint64_t(-1) && _total == _current) printf("- %s\n", _file.c_str());
         };

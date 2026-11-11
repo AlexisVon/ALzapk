@@ -40,12 +40,12 @@ tar -xzf alzapk-1.0.0-linux-x64.tar.gz && cd alzapk-1.0.0-linux-x64
 
 依赖：C++17 编译器；CMake ≥ 3.19；构建 `lza-ui` 需要 Qt6 ≥ 6.5（Core, Widgets）。
 
-`lza-cli` 静态链接 AlxLib。先从 [AlxLib v1.5.0](https://github.com/AlexisVon/AlxLib/releases/tag/v1.5.0) 下载 Linux slim 包，校验后解包到 `lib/alxlib/`：
+`lza-cli` 静态链接 AlxLib。先从 [AlxLib v1.6.1](https://github.com/AlexisVon/AlxLib/releases/tag/v1.6.1) 下载 Linux slim 包，校验后解包到 `lib/alxlib/`：
 
 ```bash
-P=AlxLib-1.5.0-linux-x64-geb3a68e-slim.tar.gz
-curl -L -o "$P" "https://github.com/AlexisVon/AlxLib/releases/download/v1.5.0/$P"
-curl -L -o "$P.sha256" "https://github.com/AlexisVon/AlxLib/releases/download/v1.5.0/$P.sha256"
+P=AlxLib-1.6.1-linux-x64-g845b899-slim.tar.gz
+curl -L -o "$P" "https://github.com/AlexisVon/AlxLib/releases/download/v1.6.1/$P"
+curl -L -o "$P.sha256" "https://github.com/AlexisVon/AlxLib/releases/download/v1.6.1/$P.sha256"
 sha256sum -c "$P.sha256"
 tar -xzf "$P" -C lib/alxlib --strip-components=1
 
@@ -73,7 +73,10 @@ lza-cli <命令> [开关] <archive.lza> [<条目>...]
 
 开关：
   -c           启用 LZ4 压缩
-  -p<password> 启用加密（a）或解密（x/l）
+  -p<password> 启用加密（a）或解密（x/l）；默认 v2 认证格式
+  -mv1         加密使用旧版 v1 格式（配合 -p）
+  -mv2         加密使用认证 v2 格式（配合 -p，默认）
+  -k<N>        v2 密钥派生轮数，1..16777216（默认 4194304）
   -o<dir>      解压输出目录（默认当前目录）
   -i           忽略不存在的源（继续打包）
   -h, --help   显示帮助
@@ -91,9 +94,11 @@ lza-cli x -psecret -o/tmp/out out.lza        # 全部解压
 
 归档内条目路径以 `/` 分隔，例如 `src/main.cpp`。退出码：0 成功，1 失败，2 用法错误。
 
+`l` 会显示归档类型（v1/v2、是否压缩/加密）以及 v2 归档的元数据（`app`、`version`）；`x` 在开始前打印同样的类型行。
+
 ## AlxLib 依赖
 
-`lib/alxlib/` 存放 AlxLib 发行包（当前 1.5.0）。升级步骤：替换压缩包、解包、全量重建。Linux 静态链接使用包内 `lib/libalxlib.a`。
+`lib/alxlib/` 存放 AlxLib 发行包（当前 1.6.1）。升级步骤：替换压缩包、解包、全量重建。Linux 静态链接使用包内 `lib/libalxlib.a`。
 
 ## MSVC
 
@@ -109,7 +114,9 @@ CMake 也支持 MSVC：`cmake -B build -G "Visual Studio 17 2022" -A x64`；编�
 
 ## 安全说明
 
-`lza-cli -p<password>` 的密码直接交给 AlxLib `fpacker` 的 AES-256 接口：不做加盐、口令拉伸（KDF）或密钥分离，且密码会出现在命令行参数与进程列表中。它适合临时防止误读，不适合保护高价值数据；需要强口令保护时，应在密钥输入前端先做 Argon2/scrypt/PBKDF2 等 KDF，或改用外部加密容器。该改动不在本版本范围内。
+带密码新建归档默认使用 v2 认证格式：每个归档生成随机盐，用 PBKDF2-HMAC-SHA256（默认 4 Mi 轮）派生密钥，数据块与索引均由 AES-256-GCM 认证；错密码或被篡改会在打开/解压时报错。`-mv1` 保留旧的 v1 格式（`SHA-256(password)` 直接作密钥、无盐、无认证），仅用于兼容旧工具。
+
+CLI 的密码仍会出现在命令行参数与进程列表中；需要隐藏密码时请使用 UI。弱口令仍是主要风险——PBKDF2 只增加每次猜测的成本，不增加熵。
 
 ## 相关项目
 

@@ -5,7 +5,7 @@ bin/
 # AlxLib package: tracked are include/, doc/, licenses/, README/LICENSE/THIRD-PARTY
 lib/alxlib/bin/
 lib/alxlib/lib/
-lib/alxlib/*.tar.gz
+lib/alxlib/*.tar.gz*
 lib/alxlib/*.zip
 
 # IDE / cache

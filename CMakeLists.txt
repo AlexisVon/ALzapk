@@ -72,6 +72,8 @@ target_link_libraries(lza-core
         ${ALXLIB_LIBS}
 )
 
+target_compile_definitions(lza-core PRIVATE LZA_VERSION="${PROJECT_VERSION}")
+
 # ---------------------------------------------------------------------------
 # lza-cli (no Qt)
 # ---------------------------------------------------------------------------

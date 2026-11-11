@@ -4,6 +4,7 @@
 #include "TaskControl.h"
 
 #include <core/archive.h>
+#include <core/format.h>
 
 #include <QAction>
 #include <QDragEnterEvent>
@@ -53,9 +54,20 @@ void DecodeWidget::open_file() {
     ui_model->setFSys(decoder->fsystem());
     ui_view->sortByColumn(0, Qt::SortOrder::AscendingOrder);
     m_decoder = std::move(decoder);
-    emit sig_message(QString(u8"文件\"%1\"打开成功").arg(m_fpath));
+
+    const alx::varmap& info = m_decoder->info();
     ui_log->clear();
-    ui_log->setVisible(false);
+    ui_log->setVisible(!info.empty());
+    for (const auto& it : info)
+        ui_log->append(QString("%1: %2")
+                           .arg(QString::fromStdString(it.first))
+                           .arg(QString::fromStdString(lza::variant_string(*it.second))));
+
+    QString type = m_decoder->version() == 2 ? u8"v2 认证" : u8"v1 兼容";
+    if (m_decoder->is_compress()) type += u8"，压缩";
+    if (m_decoder->is_encrypt()) type += u8"，加密";
+    if (!info.empty()) type += QString(u8"，元数据 %1 项").arg(qulonglong(info.size()));
+    emit sig_message(QString(u8"文件\"%1\"打开成功（%2）").arg(m_fpath).arg(type));
     ui_task->reset();
     update_sizes();
     update_empty_state();

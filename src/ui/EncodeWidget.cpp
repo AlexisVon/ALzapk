@@ -9,6 +9,7 @@
 #include <core/pack.h>
 
 #include <QCheckBox>
+#include <QComboBox>
 #include <QDragEnterEvent>
 #include <QElapsedTimer>
 #include <QFileDialog>
@@ -105,6 +106,10 @@ void EncodeWidget::init_ui() {
 
     ui_cb_compress = new QCheckBox(u8"启用压缩", options);
     ui_cb_encrypt = new QCheckBox(u8"启用加密", options);
+    ui_cb_profile = new QComboBox(options);
+    ui_cb_profile->addItem(u8"认证 v2", false);
+    ui_cb_profile->addItem(u8"兼容 v1", true);
+    ui_cb_profile->setEnabled(false);
 
     ui_fm_password = new QFrame(options);
     ui_fm_password->setObjectName("password_box");
@@ -126,6 +131,7 @@ void EncodeWidget::init_ui() {
 
     options_layout->addWidget(ui_cb_compress);
     options_layout->addWidget(ui_cb_encrypt);
+    options_layout->addWidget(ui_cb_profile);
     options_layout->addWidget(ui_fm_password);
     options_layout->addStretch(1);
     options_layout->addWidget(ui_cb_igerr);
@@ -183,7 +189,10 @@ void EncodeWidget::init_ui() {
 }
 
 void EncodeWidget::init_signal() {
-    connect(ui_cb_encrypt, &QCheckBox::toggled, this, [this](bool _checked) { ui_fm_password->setEnabled(_checked); });
+    connect(ui_cb_encrypt, &QCheckBox::toggled, this, [this](bool _checked) {
+        ui_fm_password->setEnabled(_checked);
+        ui_cb_profile->setEnabled(_checked);
+    });
     connect(ui_btn_showpwd, &QPushButton::toggled, this,
             [this](bool _checked) { ui_le_password->setEchoMode(_checked ? QLineEdit::Normal : QLineEdit::Password); });
 
@@ -225,6 +234,7 @@ void EncodeWidget::update_empty_state() {
 void EncodeWidget::set_busy(bool _busy) {
     ui_cb_compress->setEnabled(!_busy);
     ui_cb_encrypt->setEnabled(!_busy);
+    ui_cb_profile->setEnabled(!_busy && ui_cb_encrypt->isChecked());
     ui_fm_password->setEnabled(!_busy && ui_cb_encrypt->isChecked());
     ui_cb_igerr->setEnabled(!_busy);
     ui_btn_addfile->setEnabled(!_busy);
@@ -271,12 +281,16 @@ void EncodeWidget::on_run_clicked() {
     int duplicate_row{-1};
     if (ui_model->has_duplicate_name(duplicate_row)) return emit sig_message(QString(u8"第%1行出现重复名称").arg(duplicate_row + 1));
 
+    const bool encrypt = ui_cb_encrypt->isChecked();
+    if (encrypt && ui_le_password->text().isEmpty()) return emit sig_message(u8"启用加密时必须输入密码");
+
     m_args.fpath = m_fpath;
     m_args.paths = ui_model->entries();
     m_args.total = ui_model->total_size();
     m_args.compress = ui_cb_compress->isChecked();
     m_args.igerr = ui_cb_igerr->isChecked();
-    m_args.password = ui_cb_encrypt->isChecked() ? ui_le_password->text().toStdString() : std::string();
+    m_args.legacy_v1 = ui_cb_profile->currentData().toBool();
+    m_args.password = encrypt ? ui_le_password->text().toStdString() : std::string();
 
     ui_log->clear();
     ui_log->setVisible(false);
@@ -315,6 +329,7 @@ void EncodeWidget::exec_impl() {
     options.compress = m_args.compress;
     options.ignore_errors = m_args.igerr;
     options.password = m_args.password;
+    options.format = m_args.legacy_v1 ? lza::pack_format::legacy_v1 : lza::pack_format::authenticated_v2;
 
     const auto on_file = [this](const std::string& _file, uint64_t _total, uint64_t _current) {
         if (_total == uint64_t(-1)) {
@@ -343,7 +358,13 @@ void EncodeWidget::exec_impl() {
         emit sig_message(QString(u8"文件\"%1\"写入完成，耗时：%2").arg(archive).arg(time2string(total_cost.elapsed())));
         break;
     case lza::pack_result::aborted: emit sig_message(u8"已中断"); break;
-    case lza::pack_result::open_failed: emit sig_message(QString(u8"文件\"%1\"无法写入").arg(archive)); break;
+    case lza::pack_result::bad_params:
+        emit sig_message(QString(u8"文件\"%1\"参数错误：%2").arg(archive).arg(lza::pack_error(result.error)));
+        break;
+    case lza::pack_result::open_failed:
+        if (result.error != 0) emit sig_message(QString(u8"文件\"%1\"无法写入：%2").arg(archive).arg(lza::pack_error(result.error)));
+        else emit sig_message(QString(u8"文件\"%1\"无法写入").arg(archive));
+        break;
     case lza::pack_result::append_failed:
         emit sig_message(QString(u8"文件\"%1\"写入失败，错误位置：\"%2\"，错误：%3")
                              .arg(archive)

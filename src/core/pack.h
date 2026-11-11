@@ -16,10 +16,16 @@ namespace lza {
         std::string name;
     };
 
+    enum class pack_format { legacy_v1,
+                             authenticated_v2 };
+
     struct pack_options {
         bool compress{false};
         bool ignore_errors{false};
         std::string password;
+        pack_format format{pack_format::authenticated_v2};
+        /// v2 only; 0 keeps the library default (4 Mi rounds)
+        uint32_t kdf_iterations{0};
     };
 
     struct pack_progress {
@@ -31,6 +37,7 @@ namespace lza {
     struct pack_result {
         enum status { ok,
                       aborted,
+                      bad_params,
                       open_failed,
                       append_failed,
                       finish_failed };

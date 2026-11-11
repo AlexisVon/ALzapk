@@ -47,7 +47,7 @@ namespace lza {
     using extract_file_handler = std::function<void(const std::string& _file, uint64_t _total, uint64_t _current)>;
     using extract_progress_handler = std::function<void(const extract_progress&)>;
 
-    /// Size of one index entry: a file's varvec ends with its total size when the count is odd
+    /// Size of one index entry: a file's varvec always ends with its total plain size
     uint64_t entry_bytes(const alx::variant& _entry);
 
     class archive {
@@ -59,7 +59,10 @@ namespace lza {
         archive& operator=(const archive&) = delete;
 
         const alx::varmap& fsystem() const;
+        uint8_t version() const;
         bool is_encrypt() const;
+        bool is_compress() const;
+        const alx::varmap& info() const;
         uint64_t stream_bytes() const;
         uint64_t total_bytes() const;
 
@@ -68,10 +71,13 @@ namespace lza {
                                const extract_progress_handler& _on_progress);
 
     private:
-        explicit archive(alx::fpacker::decoder* _decoder);
+        archive(alx::fpacker::decoder* _decoder, uint8_t _version, bool _encrypt, bool _compress);
 
     private:
         alx::fpacker::decoder* m_decoder{nullptr};
+        uint8_t m_version{1};
+        bool m_encrypt{false};
+        bool m_compress{false};
     };
 
     const char* extract_error(uint8_t _code);

@@ -158,7 +158,7 @@ quint64 FSysTreeItem::size() const {
     if (m_childs.empty()) {
         if (m_value.type() == alx::variant::id<alx::varvec>()) {
             const alx::varvec& blocks = m_value.to<alx::varvec>();
-            m_size = blocks.size() & 0X01U ? blocks.back().to<quint64>() : 0;
+            m_size = !blocks.empty() && blocks.back().is<alx::uint_64>() ? blocks.back().to<quint64>() : 0;
         }
     } else
         for (auto it : m_childs) m_size += it->size();
