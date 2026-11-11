@@ -31,7 +31,7 @@ Linux x86-64 CLI 包（单个可执行文件 + 许可证与第三方声明）：
 
 ```bash
 # 从 github.com/AlexisVon/ALzapk/releases 下载，并用同目录的 .sha256 校验
-tar -xzf alzapk-1.0.0-linux-x64.tar.gz && cd alzapk-1.0.0-linux-x64
+tar -xzf alzapk-2.0.0-linux-x64.tar.gz && cd alzapk-2.0.0-linux-x64
 ./lza-cli a -c out.lza README.md src/
 ./lza-cli l out.lza
 ```
@@ -110,7 +110,7 @@ Visual Studio 2022（x64）用 `msvc/ALzapk.slnx`：
 - 把 AlxLib 的 Windows 发行包放到 `lib/alxlib/`（`lib/*.lib` 供链接）；工程会把 `AlxBase.dll`/`AlxCore.dll` 复制到 `bin/`。
 - Qt DLL 用 `windeployqt` 部署，或把 Qt 的 `bin` 加入 `PATH`。
 
-CMake 也支持 MSVC：`cmake -B build -G "Visual Studio 17 2022" -A x64`；编译带 `/utf-8`，构建后同样复制 AlxLib DLL。`lza-cli -v` 输出 `1.0.0`。
+CMake 也支持 MSVC：`cmake -B build -G "Visual Studio 17 2022" -A x64`；编译带 `/utf-8`，构建后同样复制 AlxLib DLL。`lza-cli -v` 输出 `2.0.0`。
 
 ## 安全说明
 

@@ -22,12 +22,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Alexis Von"
             VALUE "FileDescription", "LZA GUI"
-            VALUE "FileVersion", "1.0.0.0"
+            VALUE "FileVersion", "2.0.0.0"
             VALUE "InternalName", "lza-ui.exe"
             VALUE "LegalCopyright", "Copyright (C) 2026"
             VALUE "OriginalFilename", "lza-ui.exe"
             VALUE "ProductName", "ALzapk"
-            VALUE "ProductVersion", "1.0.0.0"
+            VALUE "ProductVersion", "2.0.0.0"
         END
     END
     BLOCK "VarFileInfo"

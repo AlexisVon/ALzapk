@@ -31,7 +31,7 @@ The Linux x86-64 CLI package (a single executable plus license and third-party n
 
 ```bash
 # Download from github.com/AlexisVon/ALzapk/releases and verify against the .sha256 beside it
-tar -xzf alzapk-1.0.0-linux-x64.tar.gz && cd alzapk-1.0.0-linux-x64
+tar -xzf alzapk-2.0.0-linux-x64.tar.gz && cd alzapk-2.0.0-linux-x64
 ./lza-cli a -c out.lza README.md src/
 ./lza-cli l out.lza
 ```
@@ -110,7 +110,7 @@ Visual Studio 2022 (x64) uses `msvc/ALzapk.slnx`:
 - Put the AlxLib Windows package under `lib/alxlib/` (`lib/*.lib` for linking); the projects copy `AlxBase.dll`/`AlxCore.dll` into `bin/`.
 - Deploy Qt DLLs with `windeployqt`, or add Qt's `bin` to `PATH`.
 
-CMake also supports MSVC: `cmake -B build -G "Visual Studio 17 2022" -A x64`; it compiles with `/utf-8` and copies the AlxLib DLLs after the build. `lza-cli -v` prints `1.0.0`.
+CMake also supports MSVC: `cmake -B build -G "Visual Studio 17 2022" -A x64`; it compiles with `/utf-8` and copies the AlxLib DLLs after the build. `lza-cli -v` prints `2.0.0`.
 
 ## Security note
 

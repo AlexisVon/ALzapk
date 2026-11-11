@@ -15,7 +15,7 @@
 #include <vector>
 
 #ifndef LZA_VERSION
-#    define LZA_VERSION "1.0.0"
+#    define LZA_VERSION "2.0.0"
 #endif
 
 namespace {

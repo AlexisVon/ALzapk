@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.19)
-project(ALzapk VERSION 1.0.0 LANGUAGES CXX)
+project(ALzapk VERSION 2.0.0 LANGUAGES CXX)
 
 # ---------------------------------------------------------------------------
 # Compiler / standard
